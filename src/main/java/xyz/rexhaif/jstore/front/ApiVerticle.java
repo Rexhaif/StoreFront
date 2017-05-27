@@ -15,8 +15,9 @@ import xyz.rexhaif.jstore.front.hashring.ObjectRouter;
 import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.Collections;
+import java.util.*;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Created by Rexhaif on 5/25/2017.
@@ -33,7 +34,7 @@ public class ApiVerticle extends AbstractVerticle {
     @Override
     public void start(Future<Void> startFuture) throws Exception {
 
-        mObjectRouter = new ObjectRouter(Collections.singletonList(Consts.localhostNode.toURL()), Consts.REDUNANCY_LEVEL);
+        mObjectRouter = new ObjectRouter(Arrays.asList("52.169.2.146", "bearka.cf"), Consts.REDUNANCY_LEVEL);
         mClient = vertx.createHttpClient();
 
         mServer = vertx.createHttpServer(
@@ -52,98 +53,126 @@ public class ApiVerticle extends AbstractVerticle {
                     byte[] key = rtx.request().getParam("key").getBytes(UTF);
                     byte[] data = rtx.getBody().getBytes();
 
-                    final int[] statusCode = {0};
+                    rtx.response().setStatusCode(201);
 
-                    for(URL server : mObjectRouter.getServers(key)) {
-                        StringBuilder sb = new StringBuilder(server.toString());
-                        sb.append(new String(key, UTF)).append("/");
-                        mClient.post(sb.toString())
+                    for(String server : mObjectRouter.getServers(key)) {
+                        String path = "/" + new String(key, UTF) + "/";
+                        mClient.post(8080, server, path)
                                 .setChunked(true)
+                                .handler(
+                                        rsp -> rtx
+                                                .response()
+                                                .setStatusCode(
+                                                        Math.max(
+                                                                rtx.response().getStatusCode(),
+                                                                rsp.statusCode()
+                                                        )
+                                                )
+                                )
                                 .write(Buffer.buffer(data))
-                                .handler(rsp -> {
-                                    statusCode[0] = Math.max(statusCode[0], rsp.statusCode());
-                                })
                                 .end();
                     }
 
-                    rtx.response().setStatusCode(statusCode[0]).end();
+                    rtx.response().end();
                 }
         );
         mRouter.get("/:key/").handler(
                 rtx -> {
                     byte[] key = rtx.request().getParam("key").getBytes(UTF);
 
-                    final boolean[] success = {false};
-                    for (URL server : mObjectRouter.getServers(key)) {
-                        if (success[0]) break;
-                        StringBuilder sb = new StringBuilder(server.toString());
-                        sb.append(new String(key, UTF)).append("/");
-
-
-                        mClient.get(sb.toString()).handler(rsp -> {
+                    AtomicInteger failCounter = new AtomicInteger(0);
+                    for (String server : mObjectRouter.getServers(key)) {
+                        String path = "/" + new String(key, UTF) + "/";
+                        mClient.getNow(8080, server, path, rsp -> {
                             if (rsp.statusCode() == 200) {
-                                success[0] = true;
-                                rsp.bodyHandler(buffer ->
-                                        rtx.response()
-                                                .setStatusCode(200)
-                                                .setChunked(true)
-                                                .write(buffer)
-                                                .end()
-                                );
+                                Buffer buffer = Buffer.buffer();
+                                rtx.response().setStatusCode(200).setChunked(true);
+                                rsp.bodyHandler(buffer::appendBuffer).endHandler(end -> {
+                                    rtx.response().end(buffer);
+                                });
+                            } else {
+                                if (failCounter.incrementAndGet() >= mObjectRouter.getServers(key).size()) {
+                                    rtx.response().setStatusCode(404).end();
+                                }
                             }
-                        }).end();
+                        });
                     }
+                    rtx.response().end();
+
+
                 }
         );
         mRouter.put("/:key/").handler(
                 rtx -> {
                     byte[] key = rtx.request().getParam("key").getBytes(UTF);
                     byte[] data = rtx.getBody().getBytes();
-                    final int[] statusCode = {0};
+                    rtx.response().setStatusCode(201);
 
-                    for (URL server : mObjectRouter.getServers(key)) {
-                        StringBuilder sb = new StringBuilder(server.toString());
-                        sb.append(new String(key, UTF)).append("/");
+                    for (String server : mObjectRouter.getServers(key)) {
+                        String path = "/" + new String(key, UTF) + "/";
 
-                        mClient.put(sb.toString()).setChunked(true).write(Buffer.buffer(data)).handler(
-                                rsp -> statusCode[0] = Math.max(statusCode[0], rsp.statusCode())
+                        mClient.put(8080, server, path).setChunked(true).write(Buffer.buffer(data)).handler(
+                                rsp -> rtx
+                                        .response()
+                                        .setStatusCode(
+                                                Math.max(
+                                                        rtx.response().getStatusCode(),
+                                                        rsp.statusCode()
+                                                )
+                                        )
                         ).end();
                     }
-                    rtx.response().setStatusCode(statusCode[0]).end();
+                    rtx.response().end();
                 }
         );
         mRouter.delete("/:key/").handler(
                 rtx -> {
                     byte[] key = rtx.request().getParam("key").getBytes(UTF);
 
-                    final int[] statusCode = {0};
+                    rtx.response().setStatusCode(200);
 
-                    for (URL server : mObjectRouter.getServers(key)) {
-                        StringBuilder sb = new StringBuilder(server.toString());
-                        sb.append(new String(key, UTF)).append("/");
+                    for (String server : mObjectRouter.getServers(key)) {
+                        String path = "/" + new String(key, UTF) + "/";
 
-                        mClient.delete(sb.toString()).handler(
-                                rsp -> statusCode[0] = Math.max(statusCode[0], rsp.statusCode())
+                        mClient.delete(8080, server, path).handler(
+                                rsp -> rtx
+                                        .response()
+                                        .setStatusCode(
+                                                Math.max(
+                                                        rtx.response().getStatusCode(),
+                                                        rsp.statusCode()
+                                                )
+                                        )
                         ).end();
                     }
-                    rtx.response().setStatusCode(statusCode[0]).end();
+                    rtx.response().end();
                 }
         );
         mRouter.head("/:key/").handler(
                 rtx -> {
                     byte[] key = rtx.request().getParam("key").getBytes(UTF);
 
-                    final int[] statusCode = {0};
 
-                    for (URL server : mObjectRouter.getServers(key)) {
-                        StringBuilder sb = new StringBuilder(server.toString());
-                        sb.append(new String(key, UTF)).append("/");
+                    rtx.response().setStatusCode(200);
+                    for (String server : mObjectRouter.getServers(key)) {
+                        String path = "/" + new String(key, UTF) + "/";
 
-                        mClient.head(sb.toString()).handler(
-                                rsp -> statusCode[0] = Math.max(statusCode[0], rsp.statusCode())
-                        ).end();
+                        mClient.headNow(
+                                8080,
+                                server,
+                                path,
+                                rsp -> rtx
+                                        .response()
+                                        .setStatusCode(
+                                                Math.max(
+                                                        rtx.response().getStatusCode(),
+                                                        rsp.statusCode()
+                                                )
+                                        )
+                        );
                     }
-                    rtx.response().setStatusCode(statusCode[0]).end();
+
+                    rtx.response().end();
                 }
         );
 

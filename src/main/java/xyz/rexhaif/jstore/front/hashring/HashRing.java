@@ -8,11 +8,11 @@ import java.util.List;
 
 public class HashRing {
 
-    private List<URL> mServers;
+    private List<String> mServers;
     private HashFunction mFunction;
 
 
-    public HashRing(List<URL> servers, HashFunction function) {
+    public HashRing(List<String> servers, HashFunction function) {
         mServers = servers;
         mFunction = function;
     }
@@ -21,12 +21,12 @@ public class HashRing {
         return mFunction;
     }
 
-    public List<URL> getServers() {
+    public List<String> getServers() {
         return mServers;
     }
 
-    public URL selectServer(byte[] key) {
-        return mServers.get(Hashing.consistentHash(mFunction.hashBytes(key), mServers.size() - 1));
+    public String selectServer(byte[] key) {
+        return mServers.get(Hashing.consistentHash(mFunction.hashBytes(key), mServers.size()));
     }
 
 }

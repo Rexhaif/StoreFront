@@ -8,10 +8,10 @@ import java.net.URL;
  */
 public class Consts {
 
-    public static final int REDUNANCY_LEVEL = 2;
+    public static final int REDUNANCY_LEVEL = 0;
 
     public static final int PORT = 8081;
 
-    public static final URI localhostNode = URI.create("http://127.0.0.1:8080/");
+    public static final String localhostNode = "127.0.0.1";
 
 }

@@ -15,7 +15,7 @@ public class ObjectRouter {
 
     private List<HashRing> hashRings;
 
-    public ObjectRouter(List<URL> servers, int backups) {
+    public ObjectRouter(List<String> servers, int backups) {
 
         hashRings = new CopyOnWriteArrayList<>();
 
@@ -35,7 +35,7 @@ public class ObjectRouter {
         JsonArray array = new JsonArray();
         hashRings.forEach(ring -> {
             JsonObject ringObj = new JsonObject();
-            ringObj.put("servers", new JsonArray(ring.getServers().stream().<String>map(URL::toString).collect(Collectors.toList())));
+            ringObj.put("servers", new JsonArray(ring.getServers()));
             ringObj.put("function", ring.getFunction().toString());
             array.add(ringObj);
         });
@@ -43,8 +43,8 @@ public class ObjectRouter {
         return object;
     }
 
-    public List<URL> getServers(byte[] key) {
-        List<URL> servers = new ArrayList<>();
+    public List<String> getServers(byte[] key) {
+        List<String> servers = new ArrayList<>();
         hashRings.forEach(ring -> servers.add(ring.selectServer(key)));
         return servers;
     }
